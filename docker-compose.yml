@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+  mosquitto:
+    build: .
+    # image: eclipse-mosquitto:latest
+    command: mosquitto -c /mosquitto.conf
+    ports:
+      - 5672:5672
+      - 15672:15672
+      - 1883:1883
