@@ -59,7 +59,7 @@ pub fn get_incoming_messages_iterator(
 }
 
 pub fn get_one_message_from_topic(topic_name: String, server_num: &i32) -> String {
-    let mut client = get_client(&server_num, None);
+    let mut client = get_client(&server_num, Some(String::from("SERVER_SINGLE_MESSAGE")));
     let topics_to_subscribe = [topic_name.as_str()];
     let qos_list = [2];
     let incoming_messages =

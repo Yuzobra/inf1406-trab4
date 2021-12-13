@@ -7,6 +7,7 @@ pub struct RequestInfo {
     pub key: String,
     pub value: i32,
     pub return_topic: String,
+    pub last_seen: i32,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]

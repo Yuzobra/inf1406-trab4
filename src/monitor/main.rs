@@ -50,7 +50,7 @@ fn main() {
     .expect("Error setting Ctrl-C handler");
 
     // Listen monitor topic
-    let mut client = mqtt_utils::get_client();
+    let mut client = mqtt_utils::get_client(&String::from("REQUESTS"));
     let topics_to_subscribe = [DFLT_MONITOR_TOPIC];
     let qos_list = [2];
     let incoming_messages =

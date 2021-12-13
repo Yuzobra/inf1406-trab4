@@ -11,6 +11,7 @@ pub struct RequestInfo {
     pub key: String,
     pub value: i32,
     pub return_topic: String,
+    pub last_seen: i32,
 }
 
 const DFLT_BROKER: &str = "tcp://localhost:1883";
@@ -31,12 +32,12 @@ pub fn try_reconnect(client: &mqtt::Client) -> bool {
     false
 }
 
-pub fn get_client() -> Client {
+pub fn get_client(client_suffix: &String) -> Client {
     let host = DFLT_BROKER.to_string();
 
     let create_opts = mqtt::CreateOptionsBuilder::new()
         .server_uri(host)
-        .client_id("MONITOR")
+        .client_id(format!("MONITOR_{}", client_suffix))
         .finalize();
 
     let client = mqtt::Client::new(create_opts).unwrap_or_else(|err| {

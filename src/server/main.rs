@@ -1,14 +1,10 @@
+use core::time;
 use std::collections::HashMap;
-// use std::collections::HashMap;
 use std::env;
 use std::process;
-// use std::io::Read;
-// use std::io::Write;
-// use std::net::TcpListener;
-// use std::net::TcpStream;
 use std::sync::mpsc::Sender;
 use std::time::SystemTime;
-// use std::thread;
+use std::time::UNIX_EPOCH;
 
 mod external_communicator;
 mod mqtt_utils;
@@ -19,6 +15,7 @@ use crate::mqtt_utils::DFLT_REQ_TOPIC;
 
 use crate::external_communicator::ExternalConnectionRequest;
 // use crate::external_communicator::ExternalConnectionRequestType;
+use crate::utils::is_this_node_search_responsability;
 use crate::utils::RequestInfo;
 // use crate::utils::SearchResult;
 use crate::values_table_handler::ValueTableRequest;
@@ -40,7 +37,7 @@ fn main() {
     let mut node_responsabilities: Vec<i32> = [server_num].to_vec(); // Start only with this node
 
     // Create search log table and hashtable handler thread
-    let mut search_log: HashMap<SystemTime, RequestInfo> = HashMap::new();
+    let mut search_log: HashMap<i32, RequestInfo> = HashMap::new();
     let values_table_tx: Sender<ValueTableRequest>;
     let node_values: HashMap<String, i32> = HashMap::new();
     if start_type == "RESTART" {
@@ -114,7 +111,7 @@ fn handle_request(
     // external_communicator_tx: Sender<ExternalConnectionRequest>,
     node_responsabilities: &mut Vec<i32>,
     server_count: &i32,
-    search_log: &mut HashMap<SystemTime, RequestInfo>,
+    search_log: &mut HashMap<i32, RequestInfo>,
     server_num: &i32,
 ) {
     if request_info.req_type == "INSERT" {
@@ -143,7 +140,13 @@ fn handle_request(
         }
 
         // Add entry to search logs
-        search_log.insert(SystemTime::now(), request_info.clone());
+        search_log.insert(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as i32,
+            request_info.clone(),
+        );
     } else if request_info.req_type == "FALHASERV" {
         println!("SERVER #{} - Recebido requisição de FALHASERV", server_num);
         if utils::should_become_substitute(&request_info, node_responsabilities, server_count) {
@@ -155,6 +158,26 @@ fn handle_request(
             node_responsabilities.insert(0, request_info.value);
 
             // Verificar se tem alguma mensagem não enviada desde o ultimo heartbeat
+            for (timestamp, saved_request_info) in search_log {
+                if timestamp > &request_info.last_seen
+                    && is_this_node_search_responsability(
+                        saved_request_info,
+                        node_responsabilities,
+                        server_count,
+                    )
+                {
+                    println!(
+                        "Server #{} - Found non answered search on key {}",
+                        server_num, saved_request_info.key
+                    );
+                    let value_table_request_type = ValueTableRequestType::Search;
+                    let value_table_request = ValueTableRequest {
+                        request_type: value_table_request_type,
+                        request_info: saved_request_info.clone(),
+                    };
+                    values_table_tx.send(value_table_request).unwrap();
+                }
+            }
         }
     } else if request_info.req_type == "NOVOSERV" {
         println!("SERVER #{} - Received NOVOSERV request", server_num);

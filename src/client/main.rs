@@ -11,6 +11,7 @@ pub struct RequestInfo {
     pub key: String,
     pub value: i32,
     pub return_topic: String,
+    pub last_seen: i32,
 }
 const REQ_TOPIC: &str = "inf1406-reqs";
 
@@ -52,6 +53,7 @@ fn _insert_value(client: &Client, key: String, value: i32, return_topic: String)
         key: key,
         value: value,
         return_topic: return_topic,
+        last_seen: -1,
     };
     let serialized_info = serde_json::to_string(&request_info).unwrap();
     send_data(&client, REQ_TOPIC, serialized_info);
@@ -65,6 +67,7 @@ fn _search_value(client: &Client, key: String, return_topic: &String) {
         key: key,
         value: -1,
         return_topic: return_topic.clone(),
+        last_seen: -1,
     };
     let serialized_info = serde_json::to_string(&request_info).unwrap();
     send_data(&client, REQ_TOPIC, serialized_info);
