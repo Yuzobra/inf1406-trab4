@@ -101,8 +101,9 @@ fn _run_main_loop(rx: Receiver<HeartbeatRequest>) {
                         last_heartbeat,
                     );
                     dead_nodes.insert(*node_id, -1);
-                    thread::sleep(Duration::from_millis(10000)); // Simulate startup
+                    thread::sleep(Duration::from_millis(10000)); // Simulate restart
                     start_server(&node_id, &received.server_count, ServerStartType::Restart);
+                    thread::sleep(Duration::from_millis(2000)); // Simulate startup
                     send_heartbeat_message(
                         &heartbeat_monitor_client,
                         &String::from("NOVOSERV"),

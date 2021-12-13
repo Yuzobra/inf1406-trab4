@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -14,6 +16,11 @@ pub struct RequestInfo {
 pub struct HeartbeatInfo {
     pub server_number: i32,
     pub timestamp: String,
+}
+
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+pub struct ContentDumpInfo {
+    pub payload: HashMap<String, i32>,
 }
 
 pub fn is_this_node_search_responsability(

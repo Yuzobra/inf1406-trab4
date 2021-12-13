@@ -64,10 +64,19 @@ pub fn get_one_message_from_topic(topic_name: String, server_num: &i32) -> Strin
     let qos_list = [2];
     let incoming_messages =
         get_incoming_messages_iterator(&mut client, &topics_to_subscribe, &qos_list);
+    println!(
+        "SERVER #{} - Getting one message from topic {}",
+        server_num, topic_name
+    );
     let mut return_message: String = String::from("");
     for msg in incoming_messages.iter() {
         if let Some(msg) = msg {
+            println!(
+                "SERVER #{} - Found one message from topic {}",
+                server_num, topic_name
+            );
             return_message = msg.payload_str().parse().unwrap();
+            break;
         } else if !client.is_connected() {
             if try_reconnect(&client) {
                 println!("Resubscribe topics...");

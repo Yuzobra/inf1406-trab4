@@ -23,12 +23,13 @@ extern crate paho_mqtt as mqtt;
 pub struct ExternalConnectionRequest {
     pub request_type: ExternalConnectionRequestType,
     pub value: i32,
+    pub value_str: String,
     pub return_topic: String,
 }
 
 pub enum ExternalConnectionRequestType {
     SearchReturn,
-    NodeSearchFollow,
+    DumpContents,
 }
 
 pub fn create_external_communicator_thread(server_num: &i32) -> Sender<ExternalConnectionRequest> {
@@ -62,20 +63,14 @@ fn _run_main_loop(rx: Receiver<ExternalConnectionRequest>, client: &Client) {
                 println!("Error sending message to waiting client: {:?}", e);
                 process::exit(1);
             }
-        } else if let ExternalConnectionRequestType::NodeSearchFollow = received.request_type {
-            // if let Ok(mut stream) = TcpStream::connect(&received.conn_ip) {
-            //     let serialized_info = serde_json::to_string(&received.conn_info).unwrap();
-            //     let res = stream.write(serialized_info.as_bytes());
-            //     match res {
-            //         Ok(_) => println!("Succesfully forwarded info to {}", received.conn_ip),
-            //         Err(_) => {
-            //             println!("Error");
-            //             process::exit(0x0)
-            //         }
-            //     }
-            // } else {
-            //     println!("Couldn't connect to server in {}", received.conn_ip);
-            // }
+        } else if let ExternalConnectionRequestType::DumpContents = received.request_type {
+            println!("Dumping to topic {}", received.return_topic);
+            let msg = mqtt::Message::new(received.return_topic, received.value_str, 2);
+            let res = client.publish(msg);
+            if let Err(e) = res {
+                println!("Error dumping contents: {:?}", e);
+                process::exit(1);
+            }
         }
     }
 }

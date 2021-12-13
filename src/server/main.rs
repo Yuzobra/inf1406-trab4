@@ -1,4 +1,3 @@
-use core::time;
 use std::collections::HashMap;
 use std::env;
 use std::process;
@@ -14,6 +13,7 @@ mod values_table_handler;
 use crate::mqtt_utils::DFLT_REQ_TOPIC;
 
 use crate::external_communicator::ExternalConnectionRequest;
+use crate::utils::ContentDumpInfo;
 // use crate::external_communicator::ExternalConnectionRequestType;
 use crate::utils::is_this_node_search_responsability;
 use crate::utils::RequestInfo;
@@ -39,17 +39,19 @@ fn main() {
     // Create search log table and hashtable handler thread
     let mut search_log: HashMap<i32, RequestInfo> = HashMap::new();
     let values_table_tx: Sender<ValueTableRequest>;
-    let node_values: HashMap<String, i32> = HashMap::new();
+    let mut node_values: HashMap<String, i32> = HashMap::new();
     if start_type == "RESTART" {
         println!(
-            "SERVER #{} - Restart started, waiting for existing state...",
-            server_num
+            "SERVER #{} - Restart started, waiting for existing state on topic RESTART_SERVER_{}",
+            server_num, server_num
         );
         let message_raw: String = mqtt_utils::get_one_message_from_topic(
             format!("RESTART_SERVER_{}", server_num),
             &server_num,
         );
         println!("SERVER #{} - Received state {}", server_num, message_raw);
+        let parsed_message: ContentDumpInfo = serde_json::from_str(&message_raw).unwrap();
+        node_values = parsed_message.payload.clone();
     }
 
     // Create external communicator thread
@@ -123,6 +125,7 @@ fn handle_request(
         let value_table_request = ValueTableRequest {
             request_type: value_table_request_type,
             request_info: request_info,
+            server_num: *server_num,
         };
         values_table_tx.send(value_table_request).unwrap();
     } else if request_info.req_type == "SEARCH" {
@@ -135,6 +138,7 @@ fn handle_request(
             let value_table_request = ValueTableRequest {
                 request_type: value_table_request_type,
                 request_info: request_info.clone(),
+                server_num: *server_num,
             };
             values_table_tx.send(value_table_request).unwrap();
         }
@@ -174,6 +178,7 @@ fn handle_request(
                     let value_table_request = ValueTableRequest {
                         request_type: value_table_request_type,
                         request_info: saved_request_info.clone(),
+                        server_num: *server_num,
                     };
                     values_table_tx.send(value_table_request).unwrap();
                 }
@@ -181,6 +186,36 @@ fn handle_request(
         }
     } else if request_info.req_type == "NOVOSERV" {
         println!("SERVER #{} - Received NOVOSERV request", server_num);
+        if node_responsabilities.contains(&request_info.value) {
+            let new_server_num = request_info.value.clone();
+            println!(
+                "SERVER #{} - Is responsible for NOVOSERV {}",
+                server_num, new_server_num
+            );
+
+            // Send current state to new server
+            let value_table_request = ValueTableRequest {
+                request_info: request_info,
+                request_type: ValueTableRequestType::DumpContents,
+                server_num: new_server_num,
+            };
+            values_table_tx.send(value_table_request).unwrap();
+
+            // Remove NOVOSERV from responsabilities
+            println!(
+                "SERVER #{} - Removing {} from responsabilities. Responsabilities before: {:?}",
+                server_num, new_server_num, node_responsabilities
+            );
+            let index = node_responsabilities
+                .iter()
+                .position(|x| *x == new_server_num)
+                .unwrap();
+            node_responsabilities.remove(index);
+            println!(
+                "SERVER #{} - Responsabilities after: {:?}",
+                server_num, node_responsabilities
+            );
+        }
     } else {
         println!(
             "Invalid {} req_type received, only \"INSERT\" and \"SEARCH\" are valid",
