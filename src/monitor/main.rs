@@ -1,12 +1,19 @@
 use std::{
     collections::HashMap,
     env,
-    process::{self, Child, Command},
+    process::{self, Child},
+    thread,
+    time::Duration,
 };
 
-use crate::mqtt_utils::DFLT_MONITOR_TOPIC;
+use crate::{
+    heartbeat_handler::{
+        create_heartbeat_handler, start_server, HeartbeatRequest, HeartbeatRequestType,
+    },
+    mqtt_utils::DFLT_MONITOR_TOPIC,
+};
 
-use crate::heartbeat_utils::HeartbeatInfo;
+mod heartbeat_handler;
 
 mod mqtt_utils;
 
@@ -21,18 +28,16 @@ fn main() {
     let server_count: i32 = args[1].parse().unwrap();
     let mut servers: HashMap<i32, Child> = HashMap::new();
 
+    // Create servers
     for i in 0..server_count {
         servers.insert(
             i,
-            Command::new("./bin/run_server.sh")
-                .arg(i.to_string())
-                .arg(server_count.to_string())
-                .spawn()
-                .expect("Error creating server"),
+            start_server(&i, &server_count, heartbeat_handler::ServerStartType::Boot),
         );
         println!("Created server {}", i);
     }
 
+    // Add SigInt trap
     ctrlc::set_handler(move || {
         println!("received Ctrl+C!");
         for i in 0..server_count {
@@ -51,20 +56,41 @@ fn main() {
     let incoming_messages =
         mqtt_utils::get_incoming_messages_iterator(&mut client, &topics_to_subscribe, &qos_list);
 
+    // Create heartbeat handler
+    let heartbeat_handler_tx = create_heartbeat_handler();
+    let _heartbeat_handler_tx = heartbeat_handler_tx.clone();
+
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_millis(15000));
+        println!("MONITOR - Searching for dead nodes");
+
+        let heartbeat_request = HeartbeatRequest {
+            heartbeat_info: None,
+            request_type: HeartbeatRequestType::SearchDeadNodes,
+            server_count: server_count,
+        };
+        _heartbeat_handler_tx.send(heartbeat_request).unwrap();
+    });
+
     for message in incoming_messages.iter() {
         if let Some(msg) = message {
             let payload = msg.payload_str();
             println!("MONITOR - {}", payload);
-            let heartbeat_info: HeartbeatInfo = serde_json::from_str(&payload).unwrap();
-            let timestamp: i32 = heartbeat_info.timestamp.parse().unwrap();
+            let heartbeat_info: heartbeat_handler::HeartbeatInfo =
+                serde_json::from_str(&payload).unwrap();
 
-            println!("Timestamp {:?}", timestamp);
-            last_heartbeats.insert(heartbeat_info.server_number, timestamp);
+            let heartbeat_request = HeartbeatRequest {
+                heartbeat_info: Some(heartbeat_info),
+                request_type: HeartbeatRequestType::Update,
+                server_count: server_count,
+            };
+
+            heartbeat_handler_tx.send(heartbeat_request).unwrap();
         } else if !client.is_connected() {
             if mqtt_utils::try_reconnect(&client) {
-                println!("Resubscribe topics...");
+                println!("MONITOR - Resubscribe topics...");
                 if let Err(e) = client.subscribe_many(&topics_to_subscribe, &qos_list) {
-                    println!("SERVER - Error subscribes topics: {:?}", e);
+                    println!("MONITOR - Error subscribes topics: {:?}", e);
                     process::exit(1);
                 }
             } else {

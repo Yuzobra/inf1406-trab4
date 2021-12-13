@@ -18,23 +18,23 @@ pub enum ValueTableRequestType {
 }
 
 pub fn create_valuetable_handler(
+    node_values: HashMap<String, i32>,
     external_communicator_tx: Sender<ExternalConnectionRequest>,
 ) -> Sender<ValueTableRequest> {
     let (tx, rx) = channel();
 
     std::thread::spawn(move || {
-        _run_main_loop(rx, external_communicator_tx);
+        _run_main_loop(node_values, rx, external_communicator_tx);
     });
 
     return tx.clone();
 }
 
 fn _run_main_loop(
+    mut node_values: HashMap<String, i32>,
     rx: Receiver<ValueTableRequest>,
     external_communicator_tx: Sender<ExternalConnectionRequest>,
 ) {
-    let mut node_values = HashMap::new();
-
     for received in rx {
         if let ValueTableRequestType::Insert = received.request_type {
             node_values.insert(

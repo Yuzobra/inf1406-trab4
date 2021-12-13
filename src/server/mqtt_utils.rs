@@ -58,6 +58,32 @@ pub fn get_incoming_messages_iterator(
     return rx;
 }
 
+pub fn get_one_message_from_topic(topic_name: String, server_num: &i32) -> String {
+    let mut client = get_client(&server_num, None);
+    let topics_to_subscribe = [topic_name.as_str()];
+    let qos_list = [2];
+    let incoming_messages =
+        get_incoming_messages_iterator(&mut client, &topics_to_subscribe, &qos_list);
+    let mut return_message: String = String::from("");
+    for msg in incoming_messages.iter() {
+        if let Some(msg) = msg {
+            return_message = msg.payload_str().parse().unwrap();
+        } else if !client.is_connected() {
+            if try_reconnect(&client) {
+                println!("Resubscribe topics...");
+                if let Err(e) = client.subscribe_many(&topics_to_subscribe, &qos_list) {
+                    println!("SERVER - Error subscribes topics: {:?}", e);
+                    process::exit(1);
+                }
+            } else {
+                println!("SERVER - Error connecting to server on get_one_message_from_topic");
+                process::exit(1);
+            }
+        }
+    }
+    return return_message;
+}
+
 pub fn connect_client(client: &Client) {
     let conn_opts = mqtt::ConnectOptionsBuilder::new()
         .keep_alive_interval(Duration::from_secs(20))

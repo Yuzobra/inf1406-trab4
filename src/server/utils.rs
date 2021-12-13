@@ -3,7 +3,7 @@ use serde::Serialize;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub struct RequestInfo {
-    pub conn_type: String, // INSERT OR SEARCH
+    pub req_type: String, // INSERT / SEARCH / FALHASERV / NOVOSERV
     pub key: String,
     pub value: i32,
     pub return_topic: String,
@@ -15,7 +15,7 @@ pub struct HeartbeatInfo {
     pub timestamp: String,
 }
 
-pub fn is_this_node_responsability(
+pub fn is_this_node_search_responsability(
     request_info: &RequestInfo,
     node_responsabilities: &Vec<i32>,
     server_count: &i32,
@@ -36,5 +36,36 @@ pub fn is_this_node_responsability(
         }
     }
 
+    return false;
+}
+
+pub fn should_become_substitute(
+    request_info: &RequestInfo,
+    node_responsabilities: &Vec<i32>,
+    server_count: &i32,
+) -> bool {
+    let failed_server_id = request_info.value;
+
+    for responsability in node_responsabilities {
+        if _should_become_subtitute(responsability, &failed_server_id, server_count) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+fn _should_become_subtitute(
+    responsability: &i32,
+    failed_server_id: &i32,
+    server_count: &i32,
+) -> bool {
+    if (failed_server_id + 1) % server_count == *responsability {
+        println!(
+            "Assuming responsability of failed server {}",
+            failed_server_id
+        );
+        return true;
+    }
     return false;
 }

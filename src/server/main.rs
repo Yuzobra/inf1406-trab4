@@ -28,26 +28,41 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     assert_eq!(
         args.len(),
-        3,
-        "The server must receive 2 arguments: its number and total server count"
+        4,
+        "The server must receive 3 arguments: its number, total server count, start type (BOOT or RESTART)"
     );
 
     let server_num: i32 = args[1].parse().unwrap();
     let server_count: i32 = args[2].parse().unwrap();
-
-    // Create search log table
-    let mut search_log: HashMap<SystemTime, RequestInfo> = HashMap::new();
+    let start_type: String = args[3].clone();
 
     // Create table with this node's responsabilities
-    let node_responsabilities: Vec<i32> = [server_num].to_vec(); // Start only with this node
+    let mut node_responsabilities: Vec<i32> = [server_num].to_vec(); // Start only with this node
+
+    // Create search log table and hashtable handler thread
+    let mut search_log: HashMap<SystemTime, RequestInfo> = HashMap::new();
+    let values_table_tx: Sender<ValueTableRequest>;
+    let node_values: HashMap<String, i32> = HashMap::new();
+    if start_type == "RESTART" {
+        println!(
+            "SERVER #{} - Restart started, waiting for existing state...",
+            server_num
+        );
+        let message_raw: String = mqtt_utils::get_one_message_from_topic(
+            format!("RESTART_SERVER_{}", server_num),
+            &server_num,
+        );
+        println!("SERVER #{} - Received state {}", server_num, message_raw);
+    }
 
     // Create external communicator thread
     let external_communicator_tx: Sender<ExternalConnectionRequest> =
         external_communicator::create_external_communicator_thread(&server_num);
 
-    // Create hashtable handler thread
-    let values_table_tx: Sender<ValueTableRequest> =
-        values_table_handler::create_valuetable_handler(external_communicator_tx.clone());
+    values_table_tx = values_table_handler::create_valuetable_handler(
+        node_values,
+        external_communicator_tx.clone(),
+    );
 
     // Listen requests topic
     let mut client = mqtt_utils::get_client(&server_num, None);
@@ -73,9 +88,10 @@ fn main() {
                     request_info,
                     _values_table_tx,
                     // _external_communicator_tx,
-                    &node_responsabilities,
+                    &mut node_responsabilities,
                     &server_count,
                     &mut search_log,
+                    &server_num,
                 );
             }
         } else if !client.is_connected() {
@@ -96,11 +112,12 @@ fn handle_request(
     request_info: RequestInfo,
     values_table_tx: Sender<ValueTableRequest>,
     // external_communicator_tx: Sender<ExternalConnectionRequest>,
-    node_responsabilities: &Vec<i32>,
+    node_responsabilities: &mut Vec<i32>,
     server_count: &i32,
     search_log: &mut HashMap<SystemTime, RequestInfo>,
+    server_num: &i32,
 ) {
-    if request_info.conn_type == "INSERT" {
+    if request_info.req_type == "INSERT" {
         println!(
             "Incoming insert request:\tKey {}\tValue:{}",
             request_info.key, request_info.value
@@ -111,8 +128,12 @@ fn handle_request(
             request_info: request_info,
         };
         values_table_tx.send(value_table_request).unwrap();
-    } else if request_info.conn_type == "SEARCH" {
-        if utils::is_this_node_responsability(&request_info, node_responsabilities, server_count) {
+    } else if request_info.req_type == "SEARCH" {
+        if utils::is_this_node_search_responsability(
+            &request_info,
+            node_responsabilities,
+            server_count,
+        ) {
             let value_table_request_type = ValueTableRequestType::Search;
             let value_table_request = ValueTableRequest {
                 request_type: value_table_request_type,
@@ -123,10 +144,24 @@ fn handle_request(
 
         // Add entry to search logs
         search_log.insert(SystemTime::now(), request_info.clone());
+    } else if request_info.req_type == "FALHASERV" {
+        println!("SERVER #{} - Recebido requisição de FALHASERV", server_num);
+        if utils::should_become_substitute(&request_info, node_responsabilities, server_count) {
+            println!(
+                "SERVER #{} - Virou responsável por {}",
+                server_num, request_info.value
+            );
+            // Inserir responsabilidade nas responsabilities
+            node_responsabilities.insert(0, request_info.value);
+
+            // Verificar se tem alguma mensagem não enviada desde o ultimo heartbeat
+        }
+    } else if request_info.req_type == "NOVOSERV" {
+        println!("SERVER #{} - Received NOVOSERV request", server_num);
     } else {
         println!(
-            "Invalid {} conn_type received, only \"INSERT\" and \"SEARCH\" are valid",
-            request_info.conn_type
+            "Invalid {} req_type received, only \"INSERT\" and \"SEARCH\" are valid",
+            request_info.req_type
         );
     }
 }

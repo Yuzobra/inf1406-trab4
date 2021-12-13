@@ -6,13 +6,12 @@ use std::env;
 mod mqtt_utils;
 
 #[derive(Serialize)]
-struct RequestInfo {
-    conn_type: String, // INSERT OR SEARCH
-    key: String,
-    value: i32,
-    return_topic: String,
+pub struct RequestInfo {
+    pub req_type: String, // INSERT / SEARCH / FALHASERV / NOVOSERV
+    pub key: String,
+    pub value: i32,
+    pub return_topic: String,
 }
-
 const REQ_TOPIC: &str = "inf1406-reqs";
 
 fn main() {
@@ -47,9 +46,9 @@ fn main() {
 }
 
 fn _insert_value(client: &Client, key: String, value: i32, return_topic: String) {
-    let conn_type = String::from("INSERT");
+    let req_type = String::from("INSERT");
     let request_info = RequestInfo {
-        conn_type: conn_type,
+        req_type: req_type,
         key: key,
         value: value,
         return_topic: return_topic,
@@ -59,10 +58,10 @@ fn _insert_value(client: &Client, key: String, value: i32, return_topic: String)
 }
 
 fn _search_value(client: &Client, key: String, return_topic: &String) {
-    let conn_type = String::from("SEARCH");
+    let req_type = String::from("SEARCH");
 
     let request_info = RequestInfo {
-        conn_type: conn_type,
+        req_type: req_type,
         key: key,
         value: -1,
         return_topic: return_topic.clone(),
