@@ -6,10 +6,10 @@ const DFLT_BROKER: &str = "tcp://localhost:1883";
 const DFLT_TOPICS: &[&str] = &["inf1406-reqs", "inf1406-mon"];
 const DFLT_QOS: &[i32] = &[2, 2];
 
-// Reconnect to the broker when connection is lost.
 fn try_reconnect(client: &mqtt::Client) -> bool {
-    println!("Connection lost. Waiting to retry connection");
-    for _ in 0..12 {
+    println!("Connection lost.");
+    for _ in 0..3 {
+        println!("Trying to reconect...");
         thread::sleep(Duration::from_millis(5000));
         if client.reconnect().is_ok() {
             println!("Successfully reconnected");
@@ -20,7 +20,6 @@ fn try_reconnect(client: &mqtt::Client) -> bool {
     false
 }
 
-// Subscribes to multiple topics.
 fn subscribe_topics(client: &mqtt::Client) {
     if let Err(e) = client.subscribe_many(DFLT_TOPICS, DFLT_QOS) {
         println!("Error subscribes topics: {:?}", e);
@@ -56,13 +55,11 @@ fn main() {
         .will_message(lwt)
         .finalize();
 
-    // Connect and wait for it to complete or fail.
     if let Err(e) = client.connect(conn_opts) {
         println!("Unable to connect:\n\t{:?}", e);
         process::exit(1);
     }
 
-    // Subscribe topics.
     subscribe_topics(&client);
 
     println!("Processing requests...");
