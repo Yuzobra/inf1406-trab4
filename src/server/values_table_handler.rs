@@ -46,7 +46,10 @@ fn _run_main_loop(
             );
         } else if let ValueTableRequestType::Search = received.request_type {
             if let Some(value) = node_values.get(received.request_info.key.as_str()) {
-                println!("Found saved info: {}", value);
+                println!(
+                    "SERVER #{} - Found saved info: {}",
+                    received.server_num, value
+                );
 
                 let external_request = ExternalConnectionRequest {
                     request_type: ExternalConnectionRequestType::SearchReturn,

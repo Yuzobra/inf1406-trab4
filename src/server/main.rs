@@ -45,7 +45,7 @@ fn main() {
             "SERVER #{} - Restart started, waiting for existing state on topic RESTART_SERVER_{}",
             server_num, server_num
         );
-        let message_raw: String = mqtt_utils::get_one_message_from_topic(
+        let message_raw: String = mqtt_utils::get_last_message_from_topic(
             format!("RESTART_SERVER_{}", server_num),
             &server_num,
         );
@@ -70,12 +70,11 @@ fn main() {
     let incoming_messages =
         mqtt_utils::get_incoming_messages_iterator(&mut client, &topics_to_subscribe, &qos_list);
 
-    println!("Server #{} receiving messages", server_num);
+    println!("Server #{} ready", server_num);
     for msg in incoming_messages.iter() {
         if let Some(msg) = msg {
             let topic = msg.topic();
             let payload = msg.payload_str();
-            println!("{}", payload);
             let request_info: RequestInfo = serde_json::from_str(&payload).unwrap();
 
             let _values_table_tx = values_table_tx.clone();
@@ -134,6 +133,10 @@ fn handle_request(
             node_responsabilities,
             server_count,
         ) {
+            println!(
+                "SERVER #{} - Responding search to key {}",
+                server_num, request_info.key
+            );
             let value_table_request_type = ValueTableRequestType::Search;
             let value_table_request = ValueTableRequest {
                 request_type: value_table_request_type,
@@ -153,7 +156,12 @@ fn handle_request(
         );
     } else if request_info.req_type == "FALHASERV" {
         println!("SERVER #{} - Recebido requisição de FALHASERV", server_num);
-        if utils::should_become_substitute(&request_info, node_responsabilities, server_count) {
+        if utils::should_become_substitute(
+            &request_info,
+            node_responsabilities,
+            server_count,
+            server_num,
+        ) {
             println!(
                 "SERVER #{} - Virou responsável por {}",
                 server_num, request_info.value
@@ -186,8 +194,9 @@ fn handle_request(
         }
     } else if request_info.req_type == "NOVOSERV" {
         println!("SERVER #{} - Received NOVOSERV request", server_num);
-        if node_responsabilities.contains(&request_info.value) {
-            let new_server_num = request_info.value.clone();
+        let novoserv_num = request_info.value.clone();
+        if node_responsabilities.contains(&novoserv_num) && novoserv_num != *server_num {
+            let new_server_num = novoserv_num;
             println!(
                 "SERVER #{} - Is responsible for NOVOSERV {}",
                 server_num, new_server_num
@@ -215,6 +224,13 @@ fn handle_request(
                 "SERVER #{} - Responsabilities after: {:?}",
                 server_num, node_responsabilities
             );
+        }
+    } else if request_info.req_type == "DIE"
+    /* DEBUG FEATURE */
+    {
+        if request_info.value == *server_num {
+            println!("SERVER #{} - Received DIE event, exiting...", server_num);
+            process::exit(0);
         }
     } else {
         println!(

@@ -3,7 +3,7 @@ use std::{env, process, thread, time::Duration};
 extern crate paho_mqtt as mqtt;
 
 const DFLT_BROKER: &str = "tcp://localhost:1883";
-const DFLT_TOPICS: &[&str] = &["inf1406-reqs", "inf1406-mon"];
+const DFLT_TOPICS: &[&str] = &["RESTART_SERVER_3", "inf1406-reqs"];
 const DFLT_QOS: &[i32] = &[2, 2];
 
 fn try_reconnect(client: &mqtt::Client) -> bool {

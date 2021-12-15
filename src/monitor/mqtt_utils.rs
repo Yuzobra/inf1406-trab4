@@ -7,7 +7,7 @@ extern crate paho_mqtt as mqtt;
 
 #[derive(Serialize)]
 pub struct RequestInfo {
-    pub req_type: String, // INSERT / SEARCH / FALHASERV / NOVOSERV
+    pub req_type: String, // INSERT / SEARCH / FALHASERV / NOVOSERV / DIE
     pub key: String,
     pub value: i32,
     pub return_topic: String,
@@ -28,7 +28,7 @@ pub fn try_reconnect(client: &mqtt::Client) -> bool {
             return true;
         }
     }
-    println!("Unable to reconnect after several attempts.");
+    println!("MONITOR - Unable to reconnect after several attempts.");
     false
 }
 

@@ -5,7 +5,7 @@ use serde::Serialize;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub struct RequestInfo {
-    pub req_type: String, // INSERT / SEARCH / FALHASERV / NOVOSERV
+    pub req_type: String, // INSERT / SEARCH / FALHASERV / NOVOSERV / DIE
     pub key: String,
     pub value: i32,
     pub return_topic: String,
@@ -33,13 +33,8 @@ pub fn is_this_node_search_responsability(
         total_char_sum += c as i32;
     }
 
-    println!("{}", total_char_sum);
     for responsability in node_responsabilities {
         if total_char_sum % server_count == (*responsability) {
-            // println!(
-            //     "Is this node's responsability to answer search on key {}, return topic {}",
-            //     request_info.key, request_info.return_topic
-            // );
             return true;
         }
     }
@@ -51,12 +46,15 @@ pub fn should_become_substitute(
     request_info: &RequestInfo,
     node_responsabilities: &Vec<i32>,
     server_count: &i32,
+    server_num: &i32,
 ) -> bool {
     let failed_server_id = request_info.value;
 
-    for responsability in node_responsabilities {
-        if _should_become_subtitute(responsability, &failed_server_id, server_count) {
-            return true;
+    if failed_server_id != *server_num {
+        for responsability in node_responsabilities {
+            if _should_become_subtitute(responsability, &failed_server_id, server_count) {
+                return true;
+            }
         }
     }
 

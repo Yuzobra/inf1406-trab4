@@ -11,6 +11,7 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use paho_mqtt::Client;
+use serde::Serialize;
 
 use crate::mqtt_utils::connect_client;
 use crate::mqtt_utils::get_client;
@@ -32,18 +33,25 @@ pub enum ExternalConnectionRequestType {
     DumpContents,
 }
 
+#[derive(Serialize)]
+pub struct SearchReturnInfo {
+    pub value: i32,
+    pub return_server: i32, // Server ID of returning server
+}
+
 pub fn create_external_communicator_thread(server_num: &i32) -> Sender<ExternalConnectionRequest> {
     let (tx, rx) = channel();
 
     let external_comm_client = get_client(server_num, Some(String::from("SERVER_EXTERNAL_COMM")));
     connect_client(&external_comm_client);
+    let mut _server_num = (*server_num).clone();
     std::thread::spawn(move || {
-        _run_main_loop(rx, &external_comm_client);
+        _run_main_loop(rx, &external_comm_client, &_server_num);
     });
 
-    let heartbeat_client = get_client(server_num, Some(String::from("SERVER_HEARBEAT")));
+    let heartbeat_client = get_client(server_num, Some(String::from("SERVER_HEARTBEAT")));
     connect_client(&heartbeat_client);
-    let _server_num = (*server_num).clone();
+    _server_num = (*server_num).clone();
     std::thread::spawn(move || loop {
         _run_heartbeat_send(&heartbeat_client, &_server_num);
         thread::sleep(Duration::from_millis(4000));
@@ -52,19 +60,36 @@ pub fn create_external_communicator_thread(server_num: &i32) -> Sender<ExternalC
     return tx.clone();
 }
 
-fn _run_main_loop(rx: Receiver<ExternalConnectionRequest>, client: &Client) {
+fn _run_main_loop(rx: Receiver<ExternalConnectionRequest>, client: &Client, server_num: &i32) {
     for received in rx {
-        println!("Received external connection request");
+        println!(
+            "SERVER #{} - Received external connection request",
+            server_num
+        );
         if let ExternalConnectionRequestType::SearchReturn = received.request_type {
-            let msg = mqtt::Message::new(received.return_topic, received.value.to_string(), 2);
+            let search_return_info = SearchReturnInfo {
+                value: received.value,
+                return_server: server_num.clone(),
+            };
+            let msg = mqtt::Message::new(
+                received.return_topic,
+                serde_json::to_string(&search_return_info).unwrap(),
+                2,
+            );
             let res = client.publish(msg);
 
             if let Err(e) = res {
-                println!("Error sending message to waiting client: {:?}", e);
+                println!(
+                    "SERVER #{} - sending message to waiting client: {:?}",
+                    server_num, e
+                );
                 process::exit(1);
             }
         } else if let ExternalConnectionRequestType::DumpContents = received.request_type {
-            println!("Dumping to topic {}", received.return_topic);
+            println!(
+                "SERVER #{} - Dumping to topic {}",
+                server_num, received.return_topic
+            );
             let msg = mqtt::Message::new(received.return_topic, received.value_str, 2);
             let res = client.publish(msg);
             if let Err(e) = res {

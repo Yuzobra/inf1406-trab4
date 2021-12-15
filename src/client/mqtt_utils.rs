@@ -1,6 +1,7 @@
 use std::{process, time::Duration};
 
 use mqtt::Client;
+use uuid::Uuid;
 
 extern crate paho_mqtt as mqtt;
 
@@ -14,7 +15,7 @@ pub fn get_client(client_num: i32) -> Client {
 
     let create_opts = mqtt::CreateOptionsBuilder::new()
         .server_uri(host)
-        .client_id(format!("CLIENT_{}", client_num))
+        .client_id(format!("CLIENT_{}_{}", client_num, Uuid::new_v4()))
         .finalize();
 
     let client = mqtt::Client::new(create_opts).unwrap_or_else(|err| {
@@ -42,10 +43,4 @@ pub fn send_data(client: &Client, topic: &str, message: String) {
     if let Err(e) = res {
         println!("Error sending message: {:?}", e);
     }
-}
-
-pub fn disconnect_client(client: Client) {
-    let tok = client.disconnect(None);
-    println!("Disconnect from the broker");
-    tok.unwrap();
 }

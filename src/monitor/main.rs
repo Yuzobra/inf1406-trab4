@@ -39,7 +39,6 @@ fn main() {
 
     // Add SigInt trap
     ctrlc::set_handler(move || {
-        println!("received Ctrl+C!");
         for i in 0..server_count {
             let child: &mut Child = servers.get_mut(&i).unwrap();
             child.kill().unwrap();
@@ -75,7 +74,7 @@ fn main() {
     for message in incoming_messages.iter() {
         if let Some(msg) = message {
             let payload = msg.payload_str();
-            println!("MONITOR - {}", payload);
+            println!("MONITOR - Heartbeat: {}", payload);
             let heartbeat_info: heartbeat_handler::HeartbeatInfo =
                 serde_json::from_str(&payload).unwrap();
 
