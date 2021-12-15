@@ -60,7 +60,7 @@ fn main() {
     let _heartbeat_handler_tx = heartbeat_handler_tx.clone();
 
     thread::spawn(move || loop {
-        thread::sleep(Duration::from_millis(15000));
+        thread::sleep(Duration::from_millis(5000));
         println!("MONITOR - Searching for dead nodes");
 
         let heartbeat_request = HeartbeatRequest {

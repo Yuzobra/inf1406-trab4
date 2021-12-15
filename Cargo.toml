@@ -13,14 +13,6 @@ ctrlc = "3.2.1"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 
 [[bin]]
-name = "sub"
-path = "src/sub/main.rs"
-
-[[bin]]
-name = "pub"
-path = "src/pub/main.rs"
-
-[[bin]]
 name = "client"
 path = "src/client/main.rs"
 
